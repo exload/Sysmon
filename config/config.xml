@@ -1,0 +1,328 @@
+<!-- sysmon-config -->
+  <!-- This is a fork based on sysmon config supplied from these guys: -->
+  <!-- Source version:	70alpha | Date: 2019-05-10 -->
+  <!-- Source author:	@SwiftOnSecurity, other contributors also credited in-line or on Git -->
+  <!-- Source project:	https://github.com/SwiftOnSecurity/sysmon-config -->
+  <!-- Source license:	Creative Commons Attribution 4.0 | You may privatize, fork, edit, teach, publish, or deploy for commercial use - with attribution in the text. -->
+  <!-- REQUIRED: Sysmon version 10 or higher (due to changes in syntax, bug-fixes and adding DNS Query logging) -->
+  <!-- NOTE: testing in Sysmon v. 10.2, current for 19/08/19 -->
+  <!-- NOTE: Sysmon is not hardened against an attacker with admin rights. Additionally, this configuration offers an attacker, willing -->
+  <!-- to study it, limited ways to evade some of the logging. If you are in a very high-threat environment, you should consider a broader, -->
+  <!-- log-most approach. However, in the vast majority of cases, an attacker will bumble through multiple behavioral traps which -->
+  <!-- this configuration monitors, especially in the first minutes. Even APT do not send their A-team unless they know you're hardened. -->
+  <!-- 10% of the effort gets 95% of the results. APT rely on nobody watching because almost nobody does. Your effort makes the difference. -->
+  <!-- NOTE: content model of XML is case sensitive. DNSQuery - incorrect, DnsQuery - is correct. -->
+  <!-- While updating configuration see error message. -->
+  <!-- USING: -->
+  <!-- Install service and driver. Specify -accepteula parameter while first installation of the service or create in HKCU\SOFTWARE\Sysinternals\System Monitor\ REG_DWORD EulaAccepted with 0x1 value -->
+  <!-- sysmon64.exe -i  -->
+  <!-- Dump current configuration (not xml file) -->
+  <!-- sysmon64.exe -c -->
+  <!-- Update configuration of an installed Sysmon driver. -->
+  <!-- sysmon64.exe -c my_config.xml -->
+  <!-- Reset configuration to defaults. Perfectly works in cmd and PowerShell 5.1 -->
+  <!-- %dash% needs to be replace with - -->
+  <!-- sysmon64.exe -c %dash%%dash% -->
+  <!-- Uninstall service and driver. -->
+  <!-- sysmon64.exe -u -->
+  <!-- TECHNICAL: -->
+  <!-- - Run sysmon.exe -? for a briefing on Sysmon configuration. -->
+  <!-- - Sysmon 8+ can track which rule caused an event to be logged through the "RuleName" field. -->
+  <!-- - If you only specify exclude for a filtering subsection, everything in that subsection is logged by default. -->
+  <!-- - Some Sysmon monitoring abilities are not meant for widely deployed general-purpose use due to performance impact. Depends on environment. -->
+  <!-- - Duplicate or overlapping "Include" rules do not result in duplicate events being logged. -->
+  <!-- - All characters enclosed by XML tags are always interpreted literally. Sysmon does not support wildcards (*), alternate characters, or RegEx. -->
+  <!-- - In registry events, the value name is appended to the full key path with a "\" delimiter. Default key values are named "\(Default)" -->
+  <!-- - "Image" is a technical term for a compiled binary file like an EXE or DLL. Also, it can match just the filename, or entire path. -->
+  <!-- - "ProcessGuid" and "LoginGuid" are not random, they contain some embedded information. https://gist.github.com/mattifestation/0102042160c9a60b2b847378c0ef70b4 -->
+  <!-- FILTERING: Filter conditions available for use are: is, is not, contains, excludes, begin with, end with, less than, more than, image -->
+  <!-- - The "image" filter is usable on any field. Same as "is" but can either match entire string, or only the text after last "\". Credit: @mattifestation -->
+<Sysmon schemaversion="4.21">
+	<!-- SYSMON META CONFIG -->
+	<!-- Both MD5 and SHA256 are the industry-standard algorithms for identifying files -->
+	<HashAlgorithms>md5,sha256</HashAlgorithms>
+	<!-- Check loaded drivers, log if their code-signing certificate has been revoked, in case malware stole one to sign a kernel driver -->
+	<CheckRevocation/>
+	<EventFiltering>
+		<!-- SYSMON EVENT ID 1 : PROCESS CREATION [ProcessCreate] -->
+		<!-- COMMENT: All processes launched will be logged, except for what matches a rule below. It's best to be as specific as possible, to avoid user-mode executables imitating other process names to avoid logging, or if malware drops files in an existing directory. -->
+		<!-- DATA: UtcTime, ProcessGuid, ProcessID, Image, FileVersion, Description, Product, Company, CommandLine, CurrentDirectory, User, LogonGuid, LogonId, TerminalSessionId, IntegrityLevel, Hashes, ParentProcessGuid, ParentProcessId, ParentImage, ParentCommandLine, RuleName -->
+		<RuleGroup name="" groupRelation="or">
+			<ProcessCreate onmatch="exclude">
+				<Image condition="is">C:\Program Files\VMware\VMware Tools\vmtoolsd.exe</Image>
+				<!--SECTION: Microsoft Windows-->
+				<Image condition="is">C:\Windows\system32\CompatTelRunner.exe</Image> <!--Windows: Customer Experience Improvement-->
+				<Image condition="is">C:\Windows\System32\wermgr.exe</Image>
+				<Image condition="is">C:\Windows\System32\mobsync.exe</Image>
+				<Image condition="is">C:\Windows\system32\conhost.exe</Image> <!--Windows: Command line interface host process-->
+				<Image condition="is">C:\Windows\System32\slui.exe</Image>
+				<Image condition="is">C:\Windows\System32\ServerManagerLauncher.exe</Image>
+				<Image condition="is">C:\Windows\SystemApps\Microsoft.Windows.Cortana_cw5n1h2txyewy\SearchUI.exe</Image>
+				<Image condition="is">C:\Windows\system32\SppExtComObj.Exe</Image> <!--Windows: KMS activation-->
+				<Image condition="is">C:\Windows\system32\sppsvc.exe</Image> <!--Windows: Software Protection Service-->
+				<CommandLine condition="is">C:\Windows\System32\RuntimeBroker.exe -Embedding</CommandLine> <!--Windows:Apps permissions [ https://fossbytes.com/runtime-broker-process-windows-10/ ] -->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k unistackSvcGroup</CommandLine> <!--Windows 10-->
+				<CommandLine condition="begin with">C:\Windows\system32\DllHost.exe /Processid</CommandLine> <!--Windows-->
+				<CommandLine condition="is">"C:\Windows\system32\backgroundTaskHost.exe" -ServerName:CortanaUI.AppXy7vb4pc2dr3kc93kfc509b1d0arkfb2x.mca</CommandLine>
+				<ParentImage condition="is">C:\Windows\system32\SearchIndexer.exe</ParentImage> <!--Windows:Search: Launches many uninteresting sub-processes-->
+				<!--SECTION: Windows:svchost-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k appmodel -s StateRepository</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k appmodel -p -s camsvc</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k appmodel</CommandLine> <!--Windows 10-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k appmodel -p -s tiledatamodelsvc</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k camera -s FrameServer</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k dcomlaunch -s LSM</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k dcomlaunch -s PlugPlay</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k defragsvc</CommandLine> <!--Windows defragmentation-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k devicesflow -s DevicesFlowUserSvc</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k imgsvc</CommandLine> <!--Microsoft:The Windows Image Acquisition Service-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k localService -s EventSystem</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k localService -s bthserv</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k LocalService -p -s BthAvctpSvc</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k localService -s nsi</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k localService -s w32Time</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k localServiceAndNoImpersonation</CommandLine> <!--Windows: Network services-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k localServiceNetworkRestricted -s Dhcp</CommandLine> <!--Windows: Network services-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k localServiceNetworkRestricted -s EventLog</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k localServiceNetworkRestricted -s TimeBrokerSvc</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k localServiceNetworkRestricted -s WFDSConMgrSvc</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k LocalServiceNetworkRestricted -s BTAGService</CommandLine>
+				<CommandLine condition="is">C:\Windows\System32\svchost.exe -k LocalSystemNetworkRestricted -p -s NcbService</CommandLine> <!--Win10:1903:Network Connection Broker-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k localServiceNetworkRestricted</CommandLine> <!--Windows: Network services-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k localServiceAndNoImpersonation -s SensrSvc</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k localServiceAndNoImpersonation -p -s SSDPSRV</CommandLine> <!--Windows:SSDP [ https://en.wikipedia.org/wiki/Simple_Service_Discovery_Protocol ] -->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k localServiceNoNetwork</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k localSystemNetworkRestricted -p -s WPDBusEnum</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k localSystemNetworkRestricted -p -s fhsvc</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k localSystemNetworkRestricted -s DeviceAssociationService</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k localSystemNetworkRestricted -s NcbService</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k localSystemNetworkRestricted -s SensorService</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k localSystemNetworkRestricted -s TabletInputService</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k localSystemNetworkRestricted -s UmRdpService</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k localSystemNetworkRestricted -s WPDBusEnum</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k localSystemNetworkRestricted -p -s NgcSvc</CommandLine> <!--Microsoft:Passport--> 
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k localServiceNetworkRestricted -p -s NgcCtnrSvc</CommandLine> <!--Microsoft:Passport Container--> 
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k localServiceAndNoImpersonation -s SCardSvr</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k netsvcs -p -s wuauserv</CommandLine>
+				<CommandLine condition="is">C:\Windows\System32\svchost.exe -k netsvcs -p -s SessionEnv</CommandLine> <!--Windows:Remote desktop configuration-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k localSystemNetworkRestricted -s WdiSystemHost</CommandLine> <!--Windows: Diagnostic System Host [ http://www.blackviper.com/windows-services/diagnostic-system-host/ ] -->
+				<CommandLine condition="is">C:\Windows\System32\svchost.exe -k localSystemNetworkRestricted -p -s WdiSystemHost</CommandLine> <!--Windows: Diagnostic System Host [ http://www.blackviper.com/windows-services/diagnostic-system-host/ ] -->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k localSystemNetworkRestricted</CommandLine> <!--Windows-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k netsvcs -p -s wlidsvc</CommandLine> <!--Windows: Windows Live Sign-In Assistant [ https://www.howtogeek.com/howto/30348/what-are-wlidsvc.exe-and-wlidsvcm.exe-and-why-are-they-running/ ] -->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k netsvcs -p -s ncaSvc</CommandLine> <!--Windows: Network Connectivity Assistant [ http://www.blackviper.com/windows-services/network-connectivity-assistant/ ] -->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k netsvcs -s BDESVC</CommandLine> <!--Windows:Network: BitLocker Drive Encryption-->
+				<CommandLine condition="is">C:\Windows\System32\svchost.exe -k netsvcs -p -s BDESVC</CommandLine> <!--Microsoft:Win10:1903:Network: BitLocker Drive Encryption-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k netsvcs -p -s BITS</CommandLine> <!--Windows:Network: Background Intelligent File Transfer (BITS) -->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k netsvcs -s BITS</CommandLine> <!--Windows:Network: Background Intelligent File Transfer (BITS) -->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k netsvcs -s CertPropSvc</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k netsvcs -s DsmSvc</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k netsvcs -p -s Appinfo</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k netsvcs -s Gpsvc</CommandLine> <!--Windows:Network: Group Policy -->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k netsvcs -s ProfSvc</CommandLine> <!--Windows: Network services-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k netsvcs -s SENS</CommandLine> <!--Windows: Network services-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k netsvcs -s SessionEnv</CommandLine> <!--Windows: Network services-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k netsvcs -s Themes</CommandLine> <!--Windows: Network services-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k netsvcs -s Winmgmt</CommandLine> <!--Windows: Windows Management Instrumentation (WMI) -->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k netsvcs</CommandLine> <!--Windows: Network services-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k networkService -p -s DoSvc</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k networkService -s Dnscache</CommandLine> <!--Windows:Network: DNS caching, other uses -->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k networkService -s LanmanWorkstation</CommandLine> <!--Windows:Network: "Workstation" service, used for SMB file-sharing connections and RDP-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k networkService -s NlaSvc</CommandLine> <!--Windows:Network: Network Location Awareness-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k networkService -s TermService</CommandLine> <!--Windows:Network: Terminal Services (RDP)-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k networkService</CommandLine> <!--Windows: Network services-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k networkServiceNetworkRestricted</CommandLine> <!--Windows: Network services-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k rPCSS</CommandLine> <!--Windows Services-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k secsvcs</CommandLine>
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k swprv</CommandLine> <!--Microsoft:Software Shadow Copy Provider-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k unistackSvcGroup</CommandLine> <!--Windows 10-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k utcsvc</CommandLine> <!--Windows Services-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k wbioSvcGroup</CommandLine> <!--Windows Services-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k werSvcGroup</CommandLine> <!--Windows: ErrorReporting-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k wusvcs -p -s WaaSMedicSvc</CommandLine> <!--Windows: Update Medic Service [ https://www.thewindowsclub.com/windows-update-medic-service ] -->
+				<CommandLine condition="is">C:\Windows\System32\svchost.exe -k wsappx -p -s ClipSVC</CommandLine> <!--Windows:Apps: Client License Service-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k wsappx -p -s AppXSvc</CommandLine> <!--Windows:Apps: AppX Deployment Service-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k wsappx -s ClipSVC</CommandLine> <!--Windows:Apps: Client License Service-->
+				<CommandLine condition="is">C:\Windows\system32\svchost.exe -k wsappx</CommandLine> <!--Windows:Apps [ https://www.howtogeek.com/320261/what-is-wsappx-and-why-is-it-running-on-my-pc/ ] -->
+				<ParentCommandLine condition="is">C:\Windows\system32\svchost.exe -k netsvcs</ParentCommandLine> <!--Windows: Network services: Spawns Consent.exe-->
+				<ParentCommandLine condition="is">C:\Windows\system32\svchost.exe -k localSystemNetworkRestricted</ParentCommandLine> <!--Windows-->
+				<ParentCommandLine condition="is">C:\Windows\system32\svchost.exe -k netsvcs</ParentCommandLine> <!--Windows-->
+				<CommandLine condition="is">C:\Windows\system32\deviceenroller.exe /c /AutoEnrollMDM</CommandLine> <!--Windows: AzureAD device enrollment agent-->
+				<!--SECTION: Microsoft:dotNet-->
+				<CommandLine condition="begin with">C:\Windows\Microsoft.NET\Framework\v4.0.30319\ngen.exe</CommandLine> <!--Microsoft:DotNet-->
+				<CommandLine condition="begin with">C:\WINDOWS\Microsoft.NET\Framework64\v4.0.30319\Ngen.exe</CommandLine> <!--Microsoft:DotNet-->
+				<Image condition="is">C:\Windows\Microsoft.NET\Framework64\v4.0.30319\mscorsvw.exe</Image> <!--Microsoft:DotNet-->
+				<Image condition="is">C:\Windows\Microsoft.NET\Framework\v4.0.30319\mscorsvw.exe</Image> <!--Microsoft:DotNet-->
+				<Image condition="is">C:\Windows\Microsoft.Net\Framework64\v3.0\WPF\PresentationFontCache.exe</Image> <!--Windows: Font cache service-->
+				<ParentCommandLine condition="contains">C:\Windows\Microsoft.NET\Framework64\v4.0.30319\ngentask.exe</ParentCommandLine>
+				<ParentImage condition="is">C:\Windows\Microsoft.NET\Framework64\v4.0.30319\mscorsvw.exe</ParentImage> <!--Microsoft:DotNet-->
+				<ParentImage condition="is">C:\Windows\Microsoft.NET\Framework64\v4.0.30319\ngentask.exe</ParentImage> <!--Microsoft:DotNet-->
+				<ParentImage condition="is">C:\Windows\Microsoft.NET\Framework\v4.0.30319\mscorsvw.exe</ParentImage> <!--Microsoft:DotNet-->
+				<ParentImage condition="is">C:\Windows\Microsoft.NET\Framework\v4.0.30319\ngentask.exe</ParentImage> <!--Microsoft:DotNet: Spawns thousands of ngen.exe processes-->
+			</ProcessCreate>
+		</RuleGroup>
+		<!-- SYSMON EVENT ID 2 : FILE CREATION TIME RETROACTIVELY CHANGED IN THE FILESYSTEM [FileCreateTime] -->
+		<!-- COMMENT:	[ https://attack.mitre.org/wiki/Technique/T1099 ]  -->
+		<!-- DATA: UtcTime, ProcessGuid, ProcessId, Image, TargetFilename, CreationUtcTime, PreviousCreationUtcTime-->
+		<RuleGroup name="" groupRelation="or">
+			<FileCreateTime onmatch="exclude">
+				<Image condition="image">C:\Windows\system32\backgroundTaskHost.exe</Image>
+			</FileCreateTime>
+		</RuleGroup>
+		<!-- SYSMON EVENT ID 3 : NETWORK CONNECTION INITIATED [NetworkConnect] -->
+		<!-- COMMENT: By default this configuration takes a very conservative approach to network logging, limited to only extremely high-signal events -->
+		<!-- DATA: UtcTime, ProcessGuid, ProcessId, Image, User, Protocol, Initiated, SourceIsIpv6, SourceIp, SourceHostname, SourcePort, SourcePortName, DestinationIsIpV6, DestinationIp, DestinationHostname, DestinationPort, DestinationPortName-->
+		<NetworkConnect onmatch="exclude">
+		</NetworkConnect>
+
+		<!--SYSMON EVENT ID 4 : RESERVED FOR SYSMON STATUS MESSAGES-->
+		<!--DATA: UtcTime, State, Version, SchemaVersion-->
+		<!--Cannot be filtered.-->
+
+		<!-- SYSMON EVENT ID 5 : PROCESS ENDED [ProcessTerminate] -->
+		<!-- COMMENT:	Useful data in building infection timelines. -->
+		<!-- DATA: UtcTime, ProcessGuid, ProcessId, Image-->
+		<RuleGroup name="" groupRelation="or">
+			<ProcessTerminate onmatch="include">
+			</ProcessTerminate>
+		</RuleGroup>
+		<!-- SYSMON EVENT ID 6 : DRIVER LOADED INTO KERNEL [DriverLoad] -->
+		<!-- COMMENT: Because drivers with bugs can be used to escalate to kernel permissions, be extremely selective about what you exclude from monitoring. Low event volume, little incentive to exclude. [ https://attack.mitre.org/wiki/Technique/T1014 ] -->
+		<!-- DATA: UtcTime, ImageLoaded, Hashes, Signed, Signature, SignatureStatus-->
+		<RuleGroup name="" groupRelation="or">
+			<DriverLoad onmatch="exclude">
+				<Signature condition="is">Microsoft Windows</Signature> <!-- Exclude signed Microsoft drivers -->
+				<Signature condition="is">VMware, Inc.</Signature> <!-- Exclude signed VMware drivers -->
+			</DriverLoad>
+		</RuleGroup>
+		<!-- SYSMON EVENT ID 7 : DLL (IMAGE) LOADED BY PROCESS [ImageLoad] -->
+		<!-- COMMENT:	Can cause high system load -->
+		<!-- DATA: UtcTime, ProcessGuid, ProcessId, Image, ImageLoaded, Hashes, Signed, Signature, SignatureStatus-->
+		<RuleGroup name="" groupRelation="or">
+			<ImageLoad onmatch="exclude">
+				<Image condition="is">C:\Distr\Sysmon\Sysmon64.exe</Image>
+				<Image condition="is">C:\Program Files\VMware\VMware Tools\vmtoolsd.exe</Image>
+				<Image condition="is">C:\Windows\System32\RuntimeBroker.exe</Image>
+				<Image condition="is">C:\Windows\SystemApps\ShellExperienceHost_cw5n1h2txyewy\ShellExperienceHost.exe</Image>
+				<Image condition="is">C:\Windows\System32\LogonUI.exe</Image>
+				<Image condition="is">C:\Windows\System32\WerFault.exe</Image>
+			</ImageLoad>
+		</RuleGroup>
+		<!-- SYSMON EVENT ID 8 : REMOTE THREAD CREATED [CreateRemoteThread] -->
+		<!-- COMMENT:	Monitor for processes injecting code into other processes. Often used by malware to cloak their actions. Also when Firefox loads Flash. [ https://attack.mitre.org/wiki/Technique/T1055 ] -->
+		<!-- DATA: UtcTime, SourceProcessGuid, SourceProcessId, SourceImage, TargetProcessId, TargetImage, NewThreadId, StartAddress, StartModule, StartFunction-->
+		<RuleGroup name="" groupRelation="or">
+			<CreateRemoteThread onmatch="exclude">
+				<!--COMMENT: Exclude mostly-safe sources and log anything else.-->
+				<SourceImage condition="is">C:\Windows\system32\wbem\WmiPrvSE.exe</SourceImage>
+				<SourceImage condition="is">C:\Windows\system32\svchost.exe</SourceImage>
+				<SourceImage condition="is">C:\Windows\system32\wininit.exe</SourceImage>
+				<SourceImage condition="is">C:\Windows\system32\csrss.exe</SourceImage>
+				<SourceImage condition="is">C:\Windows\system32\services.exe</SourceImage>
+				<SourceImage condition="is">C:\Windows\system32\winlogon.exe</SourceImage>
+				<SourceImage condition="is">C:\Windows\system32\audiodg.exe</SourceImage>
+				<StartModule condition="is">C:\Windows\system32\kernel32.dll</StartModule>
+			</CreateRemoteThread>
+		</RuleGroup>
+		<!-- SYSMON EVENT ID 9 : RAW DISK ACCESS [RawAccessRead] -->
+		<!-- COMMENT:	Can cause high system load. Monitor for raw sector-level access to the disk, often used to bypass access control lists or access locked files. -->
+		<!-- DATA: UtcTime, ProcessGuid, ProcessId, Image, Device-->
+		<RawAccessRead onmatch="exclude">
+			<RuleGroup name="" groupRelation="or">
+				<Image condition="or">C:\Program Files\VMware\VMware Tools\vmtoolsd.exe</Image>
+				<Image condition="or">C:\ProgramData\Microsoft\Windows Defender\Platform\4.18.1807.18075-0\MsMpEng.exe</Image>
+			</RuleGroup>
+		</RawAccessRead>
+		<!-- SYSMON EVENT ID 10 : INTER-PROCESS ACCESS [ProcessAccess] -->
+		<!-- COMMENT:	Can cause high system load. Monitor for processes accessing other process' memory. -->
+		<!-- DATA: UtcTime, SourceProcessGuid, SourceProcessId, SourceThreadId, SourceImage, TargetProcessGuid, TargetProcessId, TargetImage, GrantedAccess, CallTrace-->
+		<RuleGroup name="" groupRelation="or">
+			<ProcessAccess onmatch="exclude">
+				<TargetImage condition="is">C:\Windows\SystemApps\Microsoft.Windows.Cortana_cw5n1h2txyewy\SearchUI.exe</TargetImage>
+				<TargetImage condition="is">C:\Windows\SystemApps\ShellExperienceHost_cw5n1h2txyewy\ShellExperienceHost.exe</TargetImage>
+			</ProcessAccess>
+		</RuleGroup>
+		<!-- SYSMON EVENT ID 11 : FILE CREATED [FileCreate] -->
+		<!-- COMMENT: Other filesystem "minifilters" can make it appear to Sysmon that some files are being written twice. This is not a Sysmon issue, per Mark Russinovich. -->
+		<!-- You may not see files detected by antivirus. Other filesystem minifilters, like antivirus, can act before Sysmon receives the alert a file was written. -->
+		<!-- DATA: UtcTime, ProcessGuid, ProcessId, Image, TargetFilename, CreationUtcTime -->
+		<FileCreate onmatch="exclude">
+		</FileCreate>
+		<!-- SYSMON EVENT ID 12 & 13 & 14 : REGISTRY MODIFICATION [RegistryEvent] -->
+		<!-- EVENT 12: "Registry object added or deleted" -->
+		<!-- EVENT 13: "Registry value set" -->
+		<!-- EVENT 14: "Registry objected renamed" -->
+		<!-- TECHNICAL:	Possible prefixes are HKLM, HKCR, and HKU -->
+		<!-- CRITICAL:	Schema version 3.30 and higher change HKLM\="\REGISTRY\MACHINE\" and HKU\="\REGISTRY\USER\" and HKCR\="\REGISTRY\MACHINE\SOFTWARE\Classes\" and CurrentControlSet="ControlSet001" -->
+		<!-- NOTE:	Because Sysmon runs as a service, it has no filtering ability for, or concept of, HKCU or HKEY_CURRENT_USER. Use "contains" or "end with" to get around this limitation -->
+		<!-- ! CRITICAL NOTE !:	It may appear this section is MISSING important entries, but SOME RULES MONITOR MANY KEYS, so look VERY CAREFULLY to see if something is already covered. -->
+								<!-- Sysmon's wildcard monitoring along with highly-tuned generic strings cuts the rulesets down immensely, compared to doing this in other tools. -->
+		<!-- DATA: EventType, UtcTime, ProcessGuid, ProcessId, Image, TargetObject, Details (can't filter on), NewName (can't filter on) -->
+		<RuleGroup name="" groupRelation="or">
+			<RegistryEvent onmatch="exclude">
+				<Image condition="is">C:\Program Files\VMware\VMware Tools\vmtoolsd.exe</Image>
+				<Image condition="is">C:\Windows\Sysmon64.exe</Image>
+				<Image condition="is">C:\Distr\Sysmon\Sysmon64.exe</Image>
+				<Image condition="is">C:\Windows\system32\CompatTelRunner.exe</Image>
+				<Image condition="is">C:\Windows\System32\XblGameSaveTask.exe</Image>
+				<TargetObject condition="contains">\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\UserAssist\{CEBFF5CD-ACE2-4F4F-9178-9926F41749EA}\Count</TargetObject>
+				<TargetObject condition="contains">\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\SessionInfo\1\ApplicationViewManagement</TargetObject>
+				<TargetObject condition="contains">HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Notifications\Data</TargetObject>
+				<TargetObject condition="contains">\SOFTWARE\Microsoft\SystemCertificates\Disallowed\</TargetObject>
+				<TargetObject condition="begin with">HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Diagnostics\DiagTrack</TargetObject>
+				<TargetObject condition="begin with">HKLM\SOFTWARE\Microsoft\EnterpriseCertificates\Disallowed\</TargetObject>
+				<TargetObject condition="begin with">HKLM\SOFTWARE\Microsoft\SystemCertificates\Disallowed\</TargetObject>
+				<TargetObject condition="begin with">HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Group Policy\</TargetObject>
+				<TargetObject condition="begin with">HKLM\SOFTWARE\Microsoft\.NETFramework\</TargetObject>
+			</RegistryEvent>
+		</RuleGroup>
+		<!-- SYSMON EVENT ID 15 : ALTERNATE DATA STREAM CREATED [FileCreateStreamHash] -->
+		<!-- COMMENT: Any files created with an NTFS Alternate Data Stream which match these rules will be hashed and logged. -->
+		<!-- NOTE: Other filesystem minifilters can make it appear to Sysmon that some files are being written twice. This is not a Sysmon issue, per Mark Russinovich. -->
+		<!-- DATA: UtcTime, ProcessGuid, ProcessId, Image, TargetFilename, CreationUtcTime, Hash -->
+		<FileCreateStreamHash onmatch="exclude">
+		</FileCreateStreamHash>
+		<!-- SYSMON EVENT ID 17 & 18 : PIPE CREATED / PIPE CONNECTED [PipeEvent] -->
+		<!-- EVENT 17: "Pipe Created" -->
+		<!-- EVENT 18: "Pipe Connected" -->
+		<!-- DATA: UtcTime, ProcessGuid, ProcessId, PipeName, Image -->
+		<RuleGroup name="" groupRelation="or">
+			<PipeEvent onmatch="exclude">
+				<Image condition="is">C:\Windows\system32\wbem\wmiprvse.exe</Image>
+			</PipeEvent>
+		</RuleGroup>
+		<!-- SYSMON EVENT ID 19 & 20 & 21 : WMI EVENT MONITORING [WmiEvent] -->
+		<!-- EVENT 19: "WmiEventFilter activity detected" -->
+		<!-- EVENT 20: "WmiEventConsumer activity detected" -->
+		<!-- EVENT 21: "WmiEventConsumerToFilter activity detected" -->
+		<!-- DATA: EventType, UtcTime, Operation, User, Name, Type, Destination, Consumer, Filter -->
+		<WmiEvent onmatch="exclude">
+			<!--NOTE: Using exclude with no rules means everything will be logged-->
+		</WmiEvent>
+		<!-- SYSMON EVENT ID 22 : DNS QUERY [DnsQuery] -->
+		<!-- OPERATIONS:	Chrome and Firefox prefetch DNS lookups, or use alternate DNS lookup methods Sysmon won't capture. You need to turn these off. Search for Group Policy for these browsers to configure this. -->
+		<!-- CONFIG:	If you exclude microsoft.com, someone could register malware-microsoft.com and it wouldn't be logged. Use "END WITH" with leading . or "IS" operators. -->
+		<!-- CRITICAL:	Do NOT exclude "wpad" lookups. This is a MitM vector routinely used by attackers. Disable WPAD or enforce client-side DNSSEC for AD domain lookups. -->
+		<!-- DATA: RuleName, UtcTime, ProcessGuid, ProcessId, QueryName, QueryType, QueryStatus, QueryResults (can't filter on) -->
+		<RuleGroup name="" groupRelation="or">
+			<DnsQuery onmatch="exclude">
+				<!--Network noise-->
+				<QueryName condition="end with">.arpa.</QueryName> <!--Design decision to not log reverse DNS lookups. You will need to decide.-->
+				<QueryName condition="is">localhost</QueryName>
+				<QueryName condition="is">..localmachine</QueryName>
+				<!-- Microsoft -->
+				<QueryName condition="is">www.msftconnecttest.com</QueryName>
+				<QueryName condition="end with">login.live.com</QueryName> <!--Microsoft | Microsoft default exclusion-->
+				<QueryName condition="end with">.microsoft.com</QueryName> <!--Microsoft | Microsoft default exclusion-->
+				<QueryName condition="end with">.windowsupdate.com</QueryName> <!--Microsoft-->
+				<!--OSCP/CRL Common-->
+				<QueryName condition="end with">.comodoca.com</QueryName>
+				<QueryName condition="end with">.digicert.com</QueryName>
+				<QueryName condition="end with">.verisign.com</QueryName>
+				<QueryName condition="end with">.symcd.com</QueryName>
+			</DnsQuery>
+		</RuleGroup>
+		<!-- SYSMON EVENT ID 255 : ERROR -->
+		<!-- "This event is generated when an error occurred within Sysmon. They can happen if the system is under heavy load and certain tasked could not be performed or a bug exists in the Sysmon service. You can report any bugs on the Sysinternals forum or over Twitter (@markrussinovich)." -->
+		<!-- Cannot be filtered. -->
+	</EventFiltering>
+</Sysmon>
